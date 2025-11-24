@@ -1,0 +1,16 @@
+# @package _global_
+
+defaults:
+  - dreamer_v3
+  - override /algo: dreamer_v3_S
+  - override /env: autodrive
+  - _self_
+
+# Algorithm
+algo:
+  cnn_keys:
+    encoder: []
+    decoder: []
+  mlp_keys:
+    encoder: [state]
+    decoder: [state]

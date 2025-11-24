@@ -1,0 +1,15 @@
+[project]
+name = "autodrive-rlv2"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "gym-unity==0.26.0",
+    "mlagents-envs==0.26.0",
+    "protobuf==3.20.3",
+    "sheeprl",
+]
+
+[tool.uv.sources]
+sheeprl = { path = "./sheeprl" }
