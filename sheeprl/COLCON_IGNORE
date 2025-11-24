@@ -1,0 +1,1 @@
+# Colcon should skip the third-party SheepRL package during workspace builds.

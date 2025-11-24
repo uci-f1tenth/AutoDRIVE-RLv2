@@ -6,3 +6,6 @@ autodrive_macos_build.zip
 autodrive_linux_build.zip
 autodrive_windows_build.zip
 **/.DS_Store
+build
+install
+log
