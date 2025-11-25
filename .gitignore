@@ -9,3 +9,4 @@ autodrive_windows_build.zip
 build
 install
 log
+**/*.egg-info

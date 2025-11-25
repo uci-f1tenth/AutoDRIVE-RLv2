@@ -10,10 +10,5 @@
             ]
         }
     },
-    "runArgs": [
-        "--platform=linux/amd64"
-    ],
-    "remoteEnv": {
-        "XDG_RUNTIME_DIR": "/tmp/runtime-dir"
-    }
+    "postCreateCommand": "pip install ."
 }
