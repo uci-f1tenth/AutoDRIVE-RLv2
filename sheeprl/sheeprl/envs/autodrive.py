@@ -20,7 +20,7 @@ class AutoDRIVEWrapper(gym.Wrapper):
         else:
             binary_path = "autodrive_linux_build/autodrive.x86_64"
 
-        unity_env = UnityEnvironment(binary_path)
+        unity_env = UnityEnvironment(binary_path, no_graphics=True)
         self.env = UnityToGymWrapper(unity_env, allow_multiple_obs=True)
 
         self.observation_space = spaces.Dict(

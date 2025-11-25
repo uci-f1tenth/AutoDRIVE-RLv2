@@ -33,13 +33,10 @@ from std_msgs.msg import Int32, Float32 # Int32 and Float32 message classes
 from geometry_msgs.msg import Point # Point message class
 from sensor_msgs.msg import JointState, Imu, LaserScan, Image # JointState, Imu, LaserScan and Image message classes
 
-# Python mudule imports
-from attrdict import AttrDict # Mapping objects that allow their elements to be accessed both as keys and as attributes
-
 ################################################################################
 
 # ROS 2 publishers and subscribers
-pub_sub_dict = AttrDict({
+pub_sub_dict = {
     'subscribers': [
         # Vehicle data subscribers
         {'topic':'/autodrive/f1tenth_1/throttle_command', 'type': Float32, 'name': 'sub_throttle_command'},
@@ -56,7 +53,7 @@ pub_sub_dict = AttrDict({
         {'topic': '/autodrive/f1tenth_1/lidar', 'type': LaserScan, 'name': 'pub_lidar'},
         {'topic': '/autodrive/f1tenth_1/front_camera', 'type': Image, 'name': 'pub_front_camera'},
     ]
-})
+}
 
 ################################################################################
 

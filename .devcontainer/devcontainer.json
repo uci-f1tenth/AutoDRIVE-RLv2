@@ -1,5 +1,19 @@
 {
     "build": {
         "dockerfile": "Dockerfile"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "charliermarsh.ruff"
+            ]
+        }
+    },
+    "runArgs": [
+        "--platform=linux/amd64"
+    ],
+    "remoteEnv": {
+        "XDG_RUNTIME_DIR": "/tmp/runtime-dir"
     }
 }

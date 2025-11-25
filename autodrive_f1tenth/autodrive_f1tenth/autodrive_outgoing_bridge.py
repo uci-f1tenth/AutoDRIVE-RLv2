@@ -81,8 +81,8 @@ def main():
         '/autodrive/f1tenth_1/throttle_command': callback_throttle_command,
         '/autodrive/f1tenth_1/steering_command': callback_steering_command,
     } # Subscriber callback functions
-    subscribers = [autodrive_outgoing_bridge.create_subscription(e.type, e.topic, callbacks[e.topic], qos_profile)
-                   for e in config.pub_sub_dict.subscribers] # Subscribers
+    subscribers = [autodrive_outgoing_bridge.create_subscription(e["type"], e["topic"], callbacks[e["topic"]], qos_profile)
+                   for e in config.pub_sub_dict["subscribers"]] # Subscribers
     subscribers # Avoid unused variable warning
 
     # Get package's shared directory path

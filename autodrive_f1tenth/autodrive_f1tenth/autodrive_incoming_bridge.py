@@ -275,8 +275,8 @@ def main():
         depth=1 # Queue (buffer) size/depth (only honored if the “history” policy was set to “keep last”)
         )
     cv_bridge = CvBridge() # ROS bridge object for opencv library to handle image data
-    publishers = {e.name: autodrive_incoming_bridge.create_publisher(e.type, e.topic, qos_profile)
-                  for e in config.pub_sub_dict.publishers} # Publishers
+    publishers = {e["name"]: autodrive_incoming_bridge.create_publisher(e["type"], e["topic"], qos_profile)
+                  for e in config.pub_sub_dict["publishers"]} # Publishers
 
     # Recursive operations while node is alive
     while rclpy.ok():
