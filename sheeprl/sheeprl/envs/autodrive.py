@@ -1,14 +1,77 @@
 from __future__ import annotations
 
 import sys
+import threading
 from typing import Any, Dict, List, Optional, SupportsFloat, Tuple, Union
 
-from mlagents_envs.environment import UnityEnvironment  # type: ignore
-from gym_unity.envs import UnityToGymWrapper  # type: ignore
+from mlagents_envs.environment import UnityEnvironment
+from gym_unity.envs import UnityToGymWrapper
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 from gymnasium.core import RenderFrame
+import rclpy
+from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
+from sensor_msgs.msg import LaserScan
+from std_msgs.msg import Header
+
+
+class SlamToolboxBridge:
+    def __init__(self) -> None:
+        if not rclpy.ok():
+            rclpy.init()
+        self.slam_toolbox_bridge = rclpy.create_node("slam_toolbox_bridge")
+        qos_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=5,
+        )
+        self.publishers = {"pub_lidar": self.slam_toolbox_bridge.create_publisher(LaserScan, "lidar", qos_profile)}
+        self._shutdown_event = threading.Event()
+        self._spin_thread = threading.Thread(target=lambda: rclpy.spin(self.slam_toolbox_bridge), daemon=True)
+        self._spin_thread.start()
+
+    def __del__(self) -> None:
+        self.shutdown()
+
+    def shutdown(self) -> None:
+        if self._shutdown_event.is_set():
+            return
+        self._shutdown_event.set()
+        node = getattr(self, "slam_toolbox_bridge", None)
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+        thread = getattr(self, "_spin_thread", None)
+        if thread is not None and thread.is_alive() and threading.current_thread() != thread:
+            thread.join(timeout=1.0)
+
+    def publish_lidar_scan(self, lidar_scan_rate, lidar_range_array, lidar_intensity_array):
+        self.publishers["pub_lidar"].publish(
+            self.create_laser_scan_msg(lidar_scan_rate, lidar_range_array.tolist(), lidar_intensity_array.tolist())
+        )
+
+    def create_laser_scan_msg(
+        self,
+        lidar_scan_rate: float,
+        lidar_range_array: List[float],
+        lidar_intensity_array: List[float],
+    ) -> LaserScan:
+        ls = LaserScan()
+        ls.header = Header()
+        ls.header.stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
+        ls.header.frame_id = "lidar"
+        ls.angle_min = -2.35619
+        ls.angle_max = 2.35619
+        ls.angle_increment = 0.004363323
+        ls.time_increment = (1 / lidar_scan_rate) / 360
+        ls.scan_time = ls.time_increment * 360
+        ls.range_min = 0.06
+        ls.range_max = 10.0
+        ls.ranges = lidar_range_array
+        ls.intensities = lidar_intensity_array
+        return ls
 
 
 class AutoDRIVEWrapper(gym.Wrapper):
@@ -20,15 +83,16 @@ class AutoDRIVEWrapper(gym.Wrapper):
         else:
             binary_path = "autodrive_linux_build/autodrive.x86_64"
 
-        unity_env = UnityEnvironment(binary_path, no_graphics=True)
-        self.env = UnityToGymWrapper(unity_env, allow_multiple_obs=True)
+        self.env = UnityToGymWrapper(UnityEnvironment(binary_path, no_graphics=True), allow_multiple_obs=True)
 
         self.observation_space = spaces.Dict(
             {
                 "state": spaces.Box(low=-np.inf, high=np.inf, shape=(55,), dtype=np.float32),
             }
         )
-        self.action_space = spaces.MultiDiscrete([3, 3])
+        self.action_space = spaces.Box(
+            low=-1.0, high=1.0, shape=(2,), dtype=np.float32
+        )  # (0, 1) for throttle and (-1, 1) for steering
         self.reward_range = (-np.inf, np.inf)
         self._render_mode: str = "rgb_array"
         self._metadata = {"render_fps": 60}
@@ -44,12 +108,12 @@ class AutoDRIVEWrapper(gym.Wrapper):
         obs, reward, done, info = self.env.step(action)
         return self._convert_obs(obs), reward, done, False, info
 
-    def reset(self, seed=None, options=None):
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         obs = self.env.reset()
-        return self._convert_obs(obs), {}
+        return self._convert_obs(obs), {}  # type: ignore
 
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
-        return self.env.render()
+        return self.env.render()  # type: ignore
 
     def close(self):
         self.env.close()
