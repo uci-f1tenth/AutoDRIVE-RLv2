@@ -9,5 +9,5 @@ dependencies = [
     "mlagents-envs==0.26.0",
     "protobuf==3.20.3",
     "numpy==1.26.4",
-    "sheeprl @ file:./sheeprl",
+    "sheeprl @ git+https://github.com/Eclectic-Sheep/sheeprl.git",
 ]
