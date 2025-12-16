@@ -13,7 +13,6 @@ from gym_unity.envs import UnityToGymWrapper
 from gymnasium import spaces
 from gymnasium.core import RenderFrame
 from mlagents_envs.environment import UnityEnvironment
-from nav_msgs.msg import Odometry
 from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Header
@@ -30,10 +29,7 @@ class SlamToolboxBridge:
             history=QoSHistoryPolicy.KEEP_LAST,
             depth=5,
         )
-        self.publishers = {
-            "pub_lidar": self.slam_toolbox_bridge.create_publisher(LaserScan, "/scan", qos_profile),
-            "pub_odom": self.slam_toolbox_bridge.create_publisher(Odometry, "/odom", qos_profile),
-        }
+        self.lidar_publisher = self.slam_toolbox_bridge.create_publisher(LaserScan, "/scan", qos_profile)
         self.transformation_broadcaster = tf2_ros.TransformBroadcaster(self.slam_toolbox_bridge)
         self.static_transformation_broadcaster = tf2_ros.StaticTransformBroadcaster(self.slam_toolbox_bridge)
         self._shutdown_event = threading.Event()
@@ -56,30 +52,17 @@ class SlamToolboxBridge:
         if thread is not None and thread.is_alive() and threading.current_thread() != thread:
             thread.join(timeout=1.0)
 
-    def publish_lidar_scan(self, lidar_scan_rate, lidar_range_array, lidar_intensity_array):
-        self.publishers["pub_lidar"].publish(
-            self.create_laser_scan_msg(lidar_scan_rate, lidar_range_array.tolist(), lidar_intensity_array.tolist())
-        )
-
-    # def publish_odom(self, x: float, y: float, yaw: float, vx: float, vy: float, wz: float):
-    #     now = self.slam_toolbox_bridge.get_clock().now().to_msg()
-    #     qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, float(yaw))
-
-    #     odom = Odometry()
-    #     odom.header = Header()
-    #     odom.header.stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
-    #     odom.header.frame_id = "odom"
-    #     odom.child_frame_id = "base_link"
-
-    #     odom.pose.pose.position = Point(x=float(x), y=float(y), z=0.0)
-    #     odom.pose.pose.orientation = Quaternion(x=float(qx), y=float(qy), z=float(qz), w=float(qw))
-
-    #     odom.twist.twist = Twist(
-    #         linear=Vector3(x=float(vx), y=float(vy), z=0.0),
-    #         angular=Vector3(x=0.0, y=0.0, z=float(wz)),
-    #     )
-
-    #     self.publishers["pub_odom"].publish(odom)
+    def publish_lidar_scan(self, lidar_range_array):
+        scan = LaserScan()
+        scan.header.stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
+        scan.header.frame_id = "lidar"
+        scan.angle_min = -3 * np.pi / 4
+        scan.angle_max = 3 * np.pi / 4
+        scan.angle_increment = (scan.angle_max - scan.angle_min) / len(lidar_range_array)
+        scan.range_min = 0.0
+        scan.range_max = 50.0
+        scan.ranges = lidar_range_array
+        self.lidar_publisher.publish(scan)
 
     def publish_transforms(self, x: float, y: float, yaw: float):
         qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, float(yaw))
@@ -158,6 +141,7 @@ class AutoDRIVEWrapper(gym.Wrapper):
         self.reward_range = (-np.inf, np.inf)
         self._render_mode: str = "rgb_array"
         self._metadata = {"render_fps": 60}
+        self.slam_toolbox_bridge = SlamToolboxBridge()
 
     @property
     def render_mode(self) -> str:
@@ -168,6 +152,10 @@ class AutoDRIVEWrapper(gym.Wrapper):
 
     def step(self, action: Any) -> Tuple[Any, SupportsFloat, bool, bool, Dict[str, Any]]:
         obs, reward, done, info = self.env.step(action)
+        self.slam_toolbox_bridge.publish_lidar_scan(obs[0][3:])
+        self.slam_toolbox_bridge.publish_transforms(obs[0][0], obs[0][1], obs[0][2])
+        self.slam_toolbox_bridge.publish_laser_transforms()
+
         return self._convert_obs(obs), reward, done, False, info
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
