@@ -152,8 +152,8 @@ class AutoDRIVEWrapper(gym.Wrapper):
 
     def step(self, action: Any) -> Tuple[Any, SupportsFloat, bool, bool, Dict[str, Any]]:
         obs, reward, done, info = self.env.step(action)
-        self.slam_toolbox_bridge.publish_lidar_scan(obs[0][3:])
-        self.slam_toolbox_bridge.publish_transforms(obs[0][0], obs[0][1], obs[0][2])
+        self.slam_toolbox_bridge.publish_lidar_scan(obs[0][:-3])
+        self.slam_toolbox_bridge.publish_transforms(obs[0][-3], obs[0][-2], obs[0][-1])
         self.slam_toolbox_bridge.publish_laser_transforms()
 
         return self._convert_obs(obs), reward, done, False, info

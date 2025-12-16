@@ -14,10 +14,10 @@ elif sys.platform == "win32":
 else:
     binary_path = "autodrive_linux_build/autodrive.x86_64"
 
-env = UnityToGymWrapper(
-    UnityEnvironment(binary_path, no_graphics=True), allow_multiple_obs=True
-)
+env = UnityToGymWrapper(UnityEnvironment(), allow_multiple_obs=True)
 
 print(env.observation_space)
+
+print(env.step(env.action_space.sample()))
 
 env.close()
