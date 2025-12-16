@@ -16,7 +16,6 @@ from gymnasium.core import RenderFrame
 from mlagents_envs.environment import UnityEnvironment
 from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import LaserScan
-from std_msgs.msg import Header
 from tf_transformations import quaternion_from_euler
 
 
@@ -38,7 +37,10 @@ class SlamToolboxBridge:
         self._spin_thread.start()
 
     def __del__(self) -> None:
-        self.shutdown()
+        try:
+            self.shutdown()
+        except Exception:
+            pass
 
     def shutdown(self) -> None:
         if self._shutdown_event.is_set():
@@ -48,7 +50,10 @@ class SlamToolboxBridge:
         if node is not None:
             node.destroy_node()
         if rclpy.ok():
-            rclpy.shutdown()
+            try:
+                rclpy.shutdown()
+            except RuntimeError:
+                pass
         thread = getattr(self, "_spin_thread", None)
         if thread is not None and thread.is_alive() and threading.current_thread() != thread:
             thread.join(timeout=1.0)
@@ -62,7 +67,10 @@ class SlamToolboxBridge:
         scan.angle_increment = (scan.angle_max - scan.angle_min) / len(lidar_range_array)
         scan.range_min = 0.0
         scan.range_max = 50.0
-        scan.ranges = lidar_range_array
+        ranges = np.asarray(lidar_range_array, dtype=np.float32).reshape(-1)
+        ranges = np.nan_to_num(ranges, nan=scan.range_max, posinf=scan.range_max, neginf=scan.range_min)
+        ranges = np.clip(ranges, scan.range_min, scan.range_max)
+        scan.ranges = ranges.tolist()
         self.lidar_publisher.publish(scan)
 
     def publish_transforms(self, x: float, y: float, yaw: float):
@@ -98,27 +106,6 @@ class SlamToolboxBridge:
 
         self.static_transformation_broadcaster.sendTransform(t_base_lidar)
 
-    def create_laser_scan_msg(
-        self,
-        lidar_scan_rate: float,
-        lidar_range_array: List[float],
-        lidar_intensity_array: List[float],
-    ) -> LaserScan:
-        ls = LaserScan()
-        ls.header = Header()
-        ls.header.stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
-        ls.header.frame_id = "lidar"
-        ls.angle_min = -2.35619
-        ls.angle_max = 2.35619
-        ls.angle_increment = 0.004363323
-        ls.time_increment = (1 / lidar_scan_rate) / 360
-        ls.scan_time = ls.time_increment * 360
-        ls.range_min = 0.06
-        ls.range_max = 10.0
-        ls.ranges = lidar_range_array
-        ls.intensities = lidar_intensity_array
-        return ls
-
 
 class AutoDRIVEWrapper(gym.Wrapper):
     def __init__(self) -> None:
@@ -130,9 +117,11 @@ class AutoDRIVEWrapper(gym.Wrapper):
             binary_path = "autodrive_linux_build/autodrive.x86_64"
 
         if os.environ.get("UNITY_EDITOR", "").lower() in ["1", "true", "t"]:
-            self.env = UnityToGymWrapper(UnityEnvironment(), allow_multiple_obs=True)
+            unity_env = UnityEnvironment()
         else:
-            self.env = UnityToGymWrapper(UnityEnvironment(binary_path, no_graphics=True), allow_multiple_obs=True)
+            unity_env = UnityEnvironment(binary_path, no_graphics=True)
+        self.env = UnityToGymWrapper(unity_env, allow_multiple_obs=True)
+        super().__init__(self.env)
 
         self.observation_space = spaces.Dict(
             {
@@ -170,4 +159,13 @@ class AutoDRIVEWrapper(gym.Wrapper):
         return self.env.render()  # type: ignore
 
     def close(self):
-        self.env.close()
+        bridge = getattr(self, "slam_toolbox_bridge", None)
+        if bridge is not None:
+            try:
+                bridge.shutdown()
+            except Exception:
+                pass
+        try:
+            self.env.close()
+        except Exception:
+            pass
