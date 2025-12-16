@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import threading
 from typing import Any, Dict, List, Optional, SupportsFloat, Tuple, Union
@@ -128,11 +129,14 @@ class AutoDRIVEWrapper(gym.Wrapper):
         else:
             binary_path = "autodrive_linux_build/autodrive.x86_64"
 
-        self.env = UnityToGymWrapper(UnityEnvironment(binary_path, no_graphics=True), allow_multiple_obs=True)
+        if os.environ.get("UNITY_EDITOR", "").lower() in ["1", "true", "t"]:
+            self.env = UnityToGymWrapper(UnityEnvironment(), allow_multiple_obs=True)
+        else:
+            self.env = UnityToGymWrapper(UnityEnvironment(binary_path, no_graphics=True), allow_multiple_obs=True)
 
         self.observation_space = spaces.Dict(
             {
-                "state": spaces.Box(low=-np.inf, high=np.inf, shape=(55,), dtype=np.float32),
+                "state": spaces.Box(low=-np.inf, high=np.inf, shape=(53,), dtype=np.float32),
             }
         )
         self.action_space = spaces.Box(
