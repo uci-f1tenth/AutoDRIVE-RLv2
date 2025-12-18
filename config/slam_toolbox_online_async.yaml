@@ -1,0 +1,18 @@
+slam_toolbox:
+  ros__parameters:
+    # TF frames published by your bridge:
+    # - odom -> base_link (dynamic)
+    # - base_link -> lidar (static)
+    # LaserScan frame_id: lidar
+    map_frame: map
+    odom_frame: odom
+    base_frame: base_link
+
+    # Your bridge publishes LaserScan on this topic
+    scan_topic: /scan
+
+    # Online async mapping
+    mode: mapping
+
+    # Optional but commonly needed for stability
+    minimum_time_interval: 0.0

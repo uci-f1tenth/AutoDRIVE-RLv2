@@ -58,26 +58,12 @@ class SlamToolboxBridge:
         if thread is not None and thread.is_alive() and threading.current_thread() != thread:
             thread.join(timeout=1.0)
 
-    def publish_lidar_scan(self, lidar_range_array):
-        scan = LaserScan()
-        scan.header.stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
-        scan.header.frame_id = "lidar"
-        scan.angle_min = -3 * np.pi / 4
-        scan.angle_max = 3 * np.pi / 4
-        scan.angle_increment = (scan.angle_max - scan.angle_min) / len(lidar_range_array)
-        scan.range_min = 0.0
-        scan.range_max = 50.0
-        ranges = np.asarray(lidar_range_array, dtype=np.float32).reshape(-1)
-        ranges = np.nan_to_num(ranges, nan=scan.range_max, posinf=scan.range_max, neginf=scan.range_min)
-        ranges = np.clip(ranges, scan.range_min, scan.range_max)
-        scan.ranges = ranges.tolist()
-        self.lidar_publisher.publish(scan)
+    def publish(self, x: float, y: float, yaw: float, lidar_range_array: List[float]) -> None:
+        stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
 
-    def publish_transforms(self, x: float, y: float, yaw: float):
         qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, float(yaw))
-
         t_odom_base = TransformStamped()
-        t_odom_base.header.stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
+        t_odom_base.header.stamp = stamp
         t_odom_base.header.frame_id = "odom"
         t_odom_base.child_frame_id = "base_link"
         t_odom_base.transform.translation.x = float(x)
@@ -87,12 +73,24 @@ class SlamToolboxBridge:
         t_odom_base.transform.rotation.y = float(qy)
         t_odom_base.transform.rotation.z = float(qz)
         t_odom_base.transform.rotation.w = float(qw)
-
         self.transformation_broadcaster.sendTransform(t_odom_base)
 
-    def publish_laser_transforms(self) -> None:
+        scan = LaserScan()
+        scan.header.stamp = stamp
+        scan.header.frame_id = "lidar"
+        scan.angle_min = -3 * np.pi / 4
+        scan.angle_max = 3 * np.pi / 4
+        scan.angle_increment = (scan.angle_max - scan.angle_min) / len(lidar_range_array)
+        scan.range_min = 0.0
+        scan.range_max = 20.0
+        ranges = np.asarray(lidar_range_array, dtype=np.float32).reshape(-1)
+        ranges = np.nan_to_num(ranges, nan=scan.range_max, posinf=scan.range_max, neginf=scan.range_min)
+        ranges = np.clip(ranges, scan.range_min, scan.range_max)
+        scan.ranges = ranges.tolist()
+        self.lidar_publisher.publish(scan)
+
         t_base_lidar = TransformStamped()
-        t_base_lidar.header.stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
+        t_base_lidar.header.stamp = stamp
         t_base_lidar.header.frame_id = "base_link"
         t_base_lidar.child_frame_id = "lidar"
 
@@ -121,7 +119,6 @@ class AutoDRIVEWrapper(gym.Wrapper):
         else:
             unity_env = UnityEnvironment(binary_path, no_graphics=True)
         self.env = UnityToGymWrapper(unity_env, allow_multiple_obs=True)
-        super().__init__(self.env)
 
         self.observation_space = spaces.Dict(
             {
@@ -145,9 +142,7 @@ class AutoDRIVEWrapper(gym.Wrapper):
 
     def step(self, action: Any) -> Tuple[Any, SupportsFloat, bool, bool, Dict[str, Any]]:
         obs, reward, done, info = self.env.step(action)
-        self.slam_toolbox_bridge.publish_lidar_scan(obs[0][:-3])
-        self.slam_toolbox_bridge.publish_transforms(obs[0][-3], obs[0][-2], obs[0][-1])
-        self.slam_toolbox_bridge.publish_laser_transforms()
+        self.slam_toolbox_bridge.publish(obs[0][-3], obs[0][-2], obs[0][-1], obs[0][:-3])
 
         return self._convert_obs(obs), reward, done, False, info
 
