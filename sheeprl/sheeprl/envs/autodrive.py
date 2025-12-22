@@ -65,7 +65,7 @@ class SlamToolboxBridge:
         t_odom_base = TransformStamped()
         t_odom_base.header.stamp = stamp
         t_odom_base.header.frame_id = "odom"
-        t_odom_base.child_frame_id = "base_link"
+        t_odom_base.child_frame_id = "base_footprint"
         t_odom_base.transform.translation.x = float(x)
         t_odom_base.transform.translation.y = float(y)
         t_odom_base.transform.translation.z = 0.0
@@ -80,7 +80,7 @@ class SlamToolboxBridge:
         scan.header.frame_id = "lidar"
         scan.angle_min = -3 * np.pi / 4
         scan.angle_max = 3 * np.pi / 4
-        scan.angle_increment = (scan.angle_max - scan.angle_min) / len(lidar_range_array)
+        scan.angle_increment = (scan.angle_max - scan.angle_min) / (len(lidar_range_array) - 1)
         scan.range_min = 0.0
         scan.range_max = 20.0
         ranges = np.asarray(lidar_range_array, dtype=np.float32).reshape(-1)
@@ -91,7 +91,7 @@ class SlamToolboxBridge:
 
         t_base_lidar = TransformStamped()
         t_base_lidar.header.stamp = stamp
-        t_base_lidar.header.frame_id = "base_link"
+        t_base_lidar.header.frame_id = "base_footprint"
         t_base_lidar.child_frame_id = "lidar"
 
         t_base_lidar.transform.translation.x = 0.2733
