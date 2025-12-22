@@ -17,6 +17,7 @@ from mlagents_envs.environment import UnityEnvironment
 from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 from tf_transformations import quaternion_from_euler
+from geometry_msgs.msg import PoseWithCovarianceStamped
 
 
 class SlamToolboxBridge:
@@ -30,11 +31,15 @@ class SlamToolboxBridge:
             depth=5,
         )
         self.lidar_publisher = self.slam_toolbox_bridge.create_publisher(LaserScan, "/scan", qos_profile)
+        self.initialpose_publisher = self.slam_toolbox_bridge.create_publisher(
+            PoseWithCovarianceStamped, "/initialpose", qos_profile
+        )
         self.transformation_broadcaster = tf2_ros.TransformBroadcaster(self.slam_toolbox_bridge)
         self.static_transformation_broadcaster = tf2_ros.StaticTransformBroadcaster(self.slam_toolbox_bridge)
         self._shutdown_event = threading.Event()
         self._spin_thread = threading.Thread(target=lambda: rclpy.spin(self.slam_toolbox_bridge), daemon=True)
         self._spin_thread.start()
+        self.initialized = False
 
     def __del__(self) -> None:
         try:
@@ -61,7 +66,8 @@ class SlamToolboxBridge:
     def publish(self, x: float, y: float, yaw: float, lidar_range_array: List[float]) -> None:
         stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
 
-        qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, float(yaw))
+        yaw_rad = np.deg2rad(90.0 - yaw)
+        qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, yaw_rad)
         t_odom_base = TransformStamped()
         t_odom_base.header.stamp = stamp
         t_odom_base.header.frame_id = "odom"
@@ -78,15 +84,12 @@ class SlamToolboxBridge:
         scan = LaserScan()
         scan.header.stamp = stamp
         scan.header.frame_id = "lidar"
-        scan.angle_min = -3 * np.pi / 4
-        scan.angle_max = 3 * np.pi / 4
+        scan.angle_min = 3 * np.pi / 4
+        scan.angle_max = -3 * np.pi / 4
         scan.angle_increment = (scan.angle_max - scan.angle_min) / (len(lidar_range_array) - 1)
         scan.range_min = 0.0
-        scan.range_max = 20.0
-        ranges = np.asarray(lidar_range_array, dtype=np.float32).reshape(-1)
-        ranges = np.nan_to_num(ranges, nan=scan.range_max, posinf=scan.range_max, neginf=scan.range_min)
-        ranges = np.clip(ranges, scan.range_min, scan.range_max)
-        scan.ranges = ranges.tolist()
+        scan.range_max = 50.0
+        scan.ranges = np.asarray(lidar_range_array, dtype=np.float32).clip(scan.range_min, scan.range_max).tolist()
         self.lidar_publisher.publish(scan)
 
         t_base_lidar = TransformStamped()
@@ -103,6 +106,24 @@ class SlamToolboxBridge:
         t_base_lidar.transform.rotation.w = 1.0
 
         self.static_transformation_broadcaster.sendTransform(t_base_lidar)
+
+        if not self.initialized:
+            initial_pose = PoseWithCovarianceStamped()
+            initial_pose.header.stamp = stamp
+            initial_pose.header.frame_id = "map"
+
+            initial_pose.pose.pose.position.x = float(x)
+            initial_pose.pose.pose.position.y = float(y)
+            initial_pose.pose.pose.position.z = 0.0
+            initial_pose.pose.pose.orientation.x = float(qx)
+            initial_pose.pose.pose.orientation.y = float(qy)
+            initial_pose.pose.pose.orientation.z = float(qz)
+            initial_pose.pose.pose.orientation.w = float(qw)
+
+            initial_pose.pose.covariance = [0.0] * 36
+
+            self.initialpose_publisher.publish(initial_pose)
+            self.initialized = True
 
 
 class AutoDRIVEWrapper(gym.Wrapper):
@@ -148,6 +169,7 @@ class AutoDRIVEWrapper(gym.Wrapper):
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         obs = self.env.reset()
+        self.slam_toolbox_bridge.initialized = False
         return self._convert_obs(obs), {}  # type: ignore
 
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:

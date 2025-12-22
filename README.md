@@ -12,3 +12,14 @@ to start slam. To start the sim in a devcontainer friendly way, run:
 source /opt/ros/humble/setup.bash
 HYDRA_FULL_ERROR=1 UNITY_EDITOR=1 python3 sheeprl/sheeprl.py exp=dreamer_v3_autodrive env=autodrive fabric.accelerator=auto
 ```
+or
+```bash
+source /opt/ros/humble/setup.bash
+HYDRA_FULL_ERROR=1 UNITY_EDITOR=1 python3 sheeprl/sheeprl.py exp=ppo env=autodrive fabric.accelerator=auto
+```
+for testing.
+Then to launch foxglove bridge:
+```bash
+source /opt/ros/humble/setup.bash
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml
+```
