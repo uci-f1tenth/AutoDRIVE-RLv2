@@ -5,7 +5,7 @@ Download and unzip the correct platform binary from the [releases page](https://
 to run with slam:
 ```bash
 source /opt/ros/humble/setup.bash
-ros2 launch slam_toolbox online_async_launch.py
+ros2 launch slam_toolbox online_async_launch.py slam_params_file:=autodrive_online_async.yaml
 ```
 to start slam. To start the sim in a devcontainer friendly way, run:
 ```bash
