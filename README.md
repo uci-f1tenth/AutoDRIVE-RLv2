@@ -7,18 +7,20 @@ source /opt/ros/$ROS_DISTRO/setup.bash
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 ```
 ## SLAM
-to run with slam:
 ```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
 ros2 launch slam_toolbox online_async_launch.py slam_params_file:=autodrive_online_async.yaml
 ```
-## DreamerV3
+## ROS_BRIDGE
 ```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
-HYDRA_FULL_ERROR=1 UNITY_EDITOR=1 python3 sheeprl/sheeprl.py exp=dreamer_v3_autodrive env=autodrive fabric.accelerator=auto
+python3 ros_bridge.py
+```
+## DreamerV3
+```bash
+HYDRA_FULL_ERROR=1 uv run sheeprl/sheeprl.py exp=dreamer_v3_autodrive env=autodrive fabric.accelerator=auto
 ```
 ## PPO
 ```bash
-source /opt/ros/$ROS_DISTRO/setup.bash
-HYDRA_FULL_ERROR=1 UNITY_EDITOR=1 python3 sheeprl/sheeprl.py exp=ppo env=autodrive fabric.accelerator=auto
+HYDRA_FULL_ERROR=1 uv run sheeprl/sheeprl.py exp=ppo env=autodrive fabric.accelerator=auto
 ```

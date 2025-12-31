@@ -24,8 +24,11 @@ maintainers = [
 keywords = ["reinforcement", "machine", "learning", "distributed", "production"]
 license = { file = "LICENSE" }
 readme = { file = "docs/README.md", content-type = "text/markdown" }
-requires-python = ">=3.8,<3.13"
-classifiers = ["Programming Language :: Python", "Topic :: Scientific/Engineering :: Artificial Intelligence"]
+requires-python = ">=3.10,<3.13"
+classifiers = [
+  "Programming Language :: Python",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
   "gymnasium==0.29.*",
   "pygame >=2.1.3",
@@ -39,7 +42,7 @@ dependencies = [
   "rich==13.5.*",
   "opencv-python==4.8.0.*",
   "torch>=2.0,!=2.2.0",
-  "numpy<2.0"
+  "numpy<2.0",
 ]
 dynamic = ["version"]
 
@@ -51,8 +54,8 @@ include = ["sheeprl", "sheeprl.*", "hydra_plugins"]
 exclude = ["tests*", "build*", "dist*", "notebooks*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "sheeprl.__init__.__version__"}
-readme = {file = ["docs/README.md"], content-type = "text/markdown"}
+version = { attr = "sheeprl.__init__.__version__" }
+readme = { file = ["docs/README.md"], content-type = "text/markdown" }
 
 [project.scripts]
 sheeprl = "sheeprl.cli:run"
@@ -65,7 +68,12 @@ homepage = "https://eclecticsheep.ai"
 repository = "https://github.com/Eclectic-Sheep/sheeprl"
 
 [project.optional-dependencies]
-test = ["pytest==7.3.1", "pytest-timeout==2.1.0", "pytest-coverage", "importlib_resources>=6.2.0"]
+test = [
+  "pytest==7.3.1",
+  "pytest-timeout==2.1.0",
+  "pytest-coverage",
+  "importlib_resources>=6.2.0",
+]
 dev = [
   "pre-commit==3.5.0",
   "mypy==1.2.0",
@@ -143,7 +151,11 @@ markers = ["benchmark: mark test as a benchmark"]
 
 # Pytest coverage
 [tool.coverage.run]
-omit = ["./sheeprl/envs/*", "./sheeprl/available_agents.py", "sheeprl/utils/mlflow.py"]
+omit = [
+  "./sheeprl/envs/*",
+  "./sheeprl/available_agents.py",
+  "sheeprl/utils/mlflow.py",
+]
 
 [tool.prettier]
 tab_width = 2
@@ -213,10 +225,5 @@ tag = true
 push = true
 
 [tool.bumpver.file_patterns]
-"pyproject.toml" = [
-    'current_version = "{version}"',
-]
-"sheeprl/__init__.py" = [
-    '^__version__ = "{version}"$',
-]
-
+"pyproject.toml" = ['current_version = "{version}"']
+"sheeprl/__init__.py" = ['^__version__ = "{version}"$']

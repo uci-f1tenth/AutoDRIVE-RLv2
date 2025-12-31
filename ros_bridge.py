@@ -1,5 +1,5 @@
 import threading
-import socketserver
+import http.server
 
 import numpy as np
 import rclpy
@@ -8,7 +8,6 @@ from geometry_msgs.msg import TransformStamped
 from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 from slam_toolbox.srv import Reset
-from tf_transformations import quaternion_from_euler
 import json
 
 
@@ -34,7 +33,6 @@ class SlamToolboxBridge:
         self.static_transformation_broadcaster = tf2_ros.StaticTransformBroadcaster(
             self.slam_toolbox_bridge
         )
-        self._shutdown_event = threading.Event()
         self._spin_thread = threading.Thread(
             target=lambda: rclpy.spin(self.slam_toolbox_bridge), daemon=True
         )
@@ -47,24 +45,18 @@ class SlamToolboxBridge:
             pass
 
     def shutdown(self) -> None:
-        if self._shutdown_event.is_set():
-            return
-        self._shutdown_event.set()
-        node = getattr(self, "slam_toolbox_bridge", None)
-        if node is not None:
-            node.destroy_node()
-        if rclpy.ok():
-            try:
-                rclpy.shutdown()
-            except RuntimeError:
-                pass
-        thread = getattr(self, "_spin_thread", None)
-        if (
-            thread is not None
-            and thread.is_alive()
-            and threading.current_thread() != thread
-        ):
-            thread.join(timeout=1.0)
+        try:
+            self.slam_toolbox_bridge.destroy_node()
+        except Exception as e:
+            print(f"Failed to destroy slam_toolbox_bridge node: {e}")
+        try:
+            rclpy.shutdown()
+        except Exception as e:
+            print(f"Failed to shutdown rclpy: {e}")
+        try:
+            self._spin_thread.join(timeout=1.0)
+        except Exception as e:
+            print(f"Failed to join spin thread: {e}")
 
     def reset(self) -> None:
         if not self.reset_client.wait_for_service(timeout_sec=1.0):
@@ -82,7 +74,10 @@ class SlamToolboxBridge:
         stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
 
         yaw_rad = np.deg2rad(90.0 - yaw)
-        qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, yaw_rad)
+        qw = np.cos(yaw_rad / 2)
+        qx = 0.0
+        qy = 0.0
+        qz = np.sin(yaw_rad / 2)
         t_odom_base = TransformStamped()
         t_odom_base.header.stamp = stamp
         t_odom_base.header.frame_id = "odom"
@@ -129,25 +124,32 @@ class SlamToolboxBridge:
         self.static_transformation_broadcaster.sendTransform(t_base_lidar)
 
 
-with socketserver.TCPServer(
-    ("127.0.0.1", 9000), socketserver.BaseRequestHandler
-) as server:
-    bridge = SlamToolboxBridge()
-
-    class Handler(socketserver.BaseRequestHandler):
-        def handle(self):
-            data = self.request.recv(4096)
-            if not data:
-                return
-            try:
-                msg = json.loads(data.decode("utf-8"))
-                if msg["command"] == "reset":
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        content_length = int(self.headers["Content-Length"])
+        post_data = self.rfile.read(content_length)
+        try:
+            msg = json.loads(post_data.decode("utf-8"))
+            command = msg.get("command")
+            match command:
+                case "reset":
                     bridge.reset()
-                if msg["command"] == "shutdown":
-                    bridge.shutdown()
-                elif msg["command"] == "publish":
-                    bridge.publish(msg["x"], msg["y"], msg["yaw"], msg["ranges"])
-            except Exception:
-                pass
+                case "publish":
+                    bridge.publish(
+                        msg["data"][-3],
+                        msg["data"][-2],
+                        msg["data"][-1],
+                        msg["data"][:-3],
+                    )
+            self.send_response(200)
+            self.end_headers()
+        except Exception as e:
+            print(f"Error processing message: {e}")
+            self.send_response(400)
+            self.end_headers()
 
+
+bridge = SlamToolboxBridge()
+
+with http.server.HTTPServer(("127.0.0.1", 9000), Handler) as server:
     server.serve_forever()

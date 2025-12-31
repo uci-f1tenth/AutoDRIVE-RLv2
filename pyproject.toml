@@ -9,6 +9,6 @@ dependencies = [
     "mlagents-envs==0.26.0",
     "protobuf==3.20.3",
     "numpy==1.26.4",
-    "requests",
-    "sheeprl @ file:./sheeprl",
+    "requests==2.32.5",
+    "sheeprl @ file:///Users/alistair/Documents/AutoDRIVE-RLv2/sheeprl",
 ]
