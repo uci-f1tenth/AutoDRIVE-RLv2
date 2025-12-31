@@ -17,7 +17,7 @@ from mlagents_envs.environment import UnityEnvironment
 from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 from tf_transformations import quaternion_from_euler
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from slam_toolbox.srv import Reset
 
 
 class SlamToolboxBridge:
@@ -31,15 +31,12 @@ class SlamToolboxBridge:
             depth=5,
         )
         self.lidar_publisher = self.slam_toolbox_bridge.create_publisher(LaserScan, "/scan", qos_profile)
-        self.initialpose_publisher = self.slam_toolbox_bridge.create_publisher(
-            PoseWithCovarianceStamped, "/initialpose", qos_profile
-        )
+        self.reset_client = self.slam_toolbox_bridge.create_client(Reset, "/slam_toolbox/reset")
         self.transformation_broadcaster = tf2_ros.TransformBroadcaster(self.slam_toolbox_bridge)
         self.static_transformation_broadcaster = tf2_ros.StaticTransformBroadcaster(self.slam_toolbox_bridge)
         self._shutdown_event = threading.Event()
         self._spin_thread = threading.Thread(target=lambda: rclpy.spin(self.slam_toolbox_bridge), daemon=True)
         self._spin_thread.start()
-        self.initialized = False
 
     def __del__(self) -> None:
         try:
@@ -62,6 +59,14 @@ class SlamToolboxBridge:
         thread = getattr(self, "_spin_thread", None)
         if thread is not None and thread.is_alive() and threading.current_thread() != thread:
             thread.join(timeout=1.0)
+
+    def reset(self) -> None:
+        if not self.reset_client.wait_for_service(timeout_sec=1.0):
+            self.slam_toolbox_bridge.get_logger().warn("Reset service not available")
+            return
+        request = Reset.Request()
+        future = self.reset_client.call_async(request)
+        rclpy.spin_until_future_complete(self.slam_toolbox_bridge, future, timeout_sec=2.0)
 
     def publish(self, x: float, y: float, yaw: float, lidar_range_array: List[float]) -> None:
         stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
@@ -107,24 +112,6 @@ class SlamToolboxBridge:
 
         self.static_transformation_broadcaster.sendTransform(t_base_lidar)
 
-        if not self.initialized:
-            initial_pose = PoseWithCovarianceStamped()
-            initial_pose.header.stamp = stamp
-            initial_pose.header.frame_id = "map"
-
-            initial_pose.pose.pose.position.x = float(x)
-            initial_pose.pose.pose.position.y = float(y)
-            initial_pose.pose.pose.position.z = 0.0
-            initial_pose.pose.pose.orientation.x = float(qx)
-            initial_pose.pose.pose.orientation.y = float(qy)
-            initial_pose.pose.pose.orientation.z = float(qz)
-            initial_pose.pose.pose.orientation.w = float(qw)
-
-            initial_pose.pose.covariance = [0.0] * 36
-
-            self.initialpose_publisher.publish(initial_pose)
-            self.initialized = True
-
 
 class AutoDRIVEWrapper(gym.Wrapper):
     def __init__(self) -> None:
@@ -169,7 +156,7 @@ class AutoDRIVEWrapper(gym.Wrapper):
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         obs = self.env.reset()
-        self.slam_toolbox_bridge.initialized = False
+        self.slam_toolbox_bridge.reset()
         return self._convert_obs(obs), {}  # type: ignore
 
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
