@@ -126,7 +126,9 @@ class AutoDRIVEWrapper(gym.Wrapper):
             unity_env = UnityEnvironment()
         else:
             unity_env = UnityEnvironment(binary_path, no_graphics=True)
-        self.env = UnityToGymWrapper(unity_env, allow_multiple_obs=True)
+
+        env = UnityToGymWrapper(unity_env, allow_multiple_obs=True)
+        super().__init__(env)
 
         self.observation_space = spaces.Dict(
             {
@@ -151,7 +153,6 @@ class AutoDRIVEWrapper(gym.Wrapper):
     def step(self, action: Any) -> Tuple[Any, SupportsFloat, bool, bool, Dict[str, Any]]:
         obs, reward, done, info = self.env.step(action)
         self.slam_toolbox_bridge.publish(obs[0][-3], obs[0][-2], obs[0][-1], obs[0][:-3])
-
         return self._convert_obs(obs), reward, done, False, info
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
