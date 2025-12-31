@@ -10,5 +10,4 @@
             ]
         }
     },
-    "postCreateCommand": "pip install --user --break-system-packages ."
 }
