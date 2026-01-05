@@ -10,5 +10,5 @@ dependencies = [
     "protobuf==3.20.3",
     "numpy==1.26.4",
     "requests==2.32.5",
-    "sheeprl @ file:///Users/alistair/Documents/AutoDRIVE-RLv2/sheeprl",
+    "sheeprl @ file:///workspaces/AutoDRIVE-RLv2/sheeprl",
 ]

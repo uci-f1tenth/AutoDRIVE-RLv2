@@ -1,4 +1,4 @@
-FROM ros:kilted-ros-base
+FROM docker.io/ros:kilted-ros-base
 
 RUN sudo apt-get update
 RUN sudo apt-get install -y ros-$ROS_DISTRO-foxglove-bridge ros-$ROS_DISTRO-slam-toolbox ros-$ROS_DISTRO-tf-transformations python3-pip
