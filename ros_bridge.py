@@ -69,44 +69,46 @@ class SlamToolboxBridge:
         )
 
     def publish(
-        self, x: float, y: float, yaw: float, lidar_range_array: list[float]
+        self,
+        x: float | None = None,
+        y: float | None = None,
+        yaw: float | None = None,
+        lidar_range_array: list[float] | None = None,
     ) -> None:
         stamp = self.slam_toolbox_bridge.get_clock().now().to_msg()
 
-        yaw_rad = np.deg2rad(90.0 - yaw)
-        qw = np.cos(yaw_rad / 2)
-        qx = 0.0
-        qy = 0.0
-        qz = np.sin(yaw_rad / 2)
-        t_odom_base = TransformStamped()
-        t_odom_base.header.stamp = stamp
-        t_odom_base.header.frame_id = "odom"
-        t_odom_base.child_frame_id = "base_footprint"
-        t_odom_base.transform.translation.x = float(x)
-        t_odom_base.transform.translation.y = float(y)
-        t_odom_base.transform.translation.z = 0.0
-        t_odom_base.transform.rotation.x = float(qx)
-        t_odom_base.transform.rotation.y = float(qy)
-        t_odom_base.transform.rotation.z = float(qz)
-        t_odom_base.transform.rotation.w = float(qw)
-        self.transformation_broadcaster.sendTransform(t_odom_base)
+        if x is not None and y is not None and yaw is not None:
+            yaw_rad = np.deg2rad(90.0 - yaw)
+            qw = np.cos(yaw_rad / 2)
+            qx = 0.0
+            qy = 0.0
+            qz = np.sin(yaw_rad / 2)
+            t_odom_base = TransformStamped()
+            t_odom_base.header.stamp = stamp
+            t_odom_base.header.frame_id = "odom"
+            t_odom_base.child_frame_id = "base_footprint"
+            t_odom_base.transform.translation.x = float(x - 7)
+            t_odom_base.transform.translation.y = float(y - 14)
+            t_odom_base.transform.translation.z = 0.0
+            t_odom_base.transform.rotation.x = float(qx)
+            t_odom_base.transform.rotation.y = float(qy)
+            t_odom_base.transform.rotation.z = float(qz)
+            t_odom_base.transform.rotation.w = float(qw)
+            self.transformation_broadcaster.sendTransform(t_odom_base)
 
-        scan = LaserScan()
-        scan.header.stamp = stamp
-        scan.header.frame_id = "lidar"
-        scan.angle_min = 3 * np.pi / 4
-        scan.angle_max = -3 * np.pi / 4
-        scan.angle_increment = (scan.angle_max - scan.angle_min) / (
-            len(lidar_range_array) - 1
-        )
-        scan.range_min = 0.0
-        scan.range_max = 50.0
-        scan.ranges = (
-            np.asarray(lidar_range_array, dtype=np.float32)
-            .clip(scan.range_min, scan.range_max)
-            .tolist()
-        )
-        self.lidar_publisher.publish(scan)
+        if lidar_range_array is not None:
+            scan = LaserScan()
+            scan.header.stamp = stamp
+            scan.header.frame_id = "lidar"
+            scan.angle_min = 3 * np.pi / 4
+            scan.angle_max = -3 * np.pi / 4
+            scan.angle_increment = (scan.angle_max - scan.angle_min) / (
+                len(lidar_range_array) - 1
+            )
+            scan.range_min = 0.0
+            scan.range_max = 100.0
+            scan.ranges = lidar_range_array
+            self.lidar_publisher.publish(scan)
 
         t_base_lidar = TransformStamped()
         t_base_lidar.header.stamp = stamp
@@ -125,6 +127,9 @@ class SlamToolboxBridge:
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
     def do_POST(self):
         content_length = int(self.headers["Content-Length"])
         post_data = self.rfile.read(content_length)
@@ -134,6 +139,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             match command:
                 case "reset":
                     bridge.reset()
+                case "publish_lidar":
+                    bridge.publish(
+                        lidar_range_array=msg["data"],
+                    )
+                case "publish_pose":
+                    bridge.publish(
+                        x=msg["data"][0],
+                        y=msg["data"][1],
+                        yaw=msg["data"][2],
+                    )
                 case "publish":
                     bridge.publish(
                         msg["data"][-3],
