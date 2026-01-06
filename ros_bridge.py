@@ -160,5 +160,5 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 bridge = SlamToolboxBridge()
 
-with http.server.HTTPServer(("127.0.0.1", 9000), Handler) as server:
+with http.server.HTTPServer(("0.0.0.0", 9000), Handler) as server:
     server.serve_forever()
