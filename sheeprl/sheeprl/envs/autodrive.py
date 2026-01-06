@@ -44,9 +44,6 @@ class AutoDRIVEWrapper(gym.Wrapper):
         self._render_mode: str = "rgb_array"
         self._metadata = {"render_fps": 60}
 
-    def __del__(self) -> None:
-        self.close()
-
     @property
     def render_mode(self) -> str:
         return self._render_mode

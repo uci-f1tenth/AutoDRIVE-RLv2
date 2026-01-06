@@ -40,12 +40,6 @@ class SlamToolboxBridge:
 
     def __del__(self) -> None:
         try:
-            self.shutdown()
-        except Exception:
-            pass
-
-    def shutdown(self) -> None:
-        try:
             self.slam_toolbox_bridge.destroy_node()
         except Exception as e:
             print(f"Failed to destroy slam_toolbox_bridge node: {e}")
@@ -106,7 +100,7 @@ class SlamToolboxBridge:
                 len(lidar_range_array) - 1
             )
             scan.range_min = 0.0
-            scan.range_max = 100.0
+            scan.range_max = 20.0
             scan.ranges = lidar_range_array
             self.lidar_publisher.publish(scan)
 
