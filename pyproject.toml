@@ -11,6 +11,11 @@ dependencies = [
     "numpy==1.26.4",
     "requests==2.32.5",
     "sheeprl",
+    "opencv-python-headless",
+    "scikit-image",
+    "scipy",
+    "matplotlib",
+    "networkx>=3.4.2",
 ]
 
 [tool.uv.sources]
