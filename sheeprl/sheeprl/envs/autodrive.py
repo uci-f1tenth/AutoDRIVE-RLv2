@@ -34,7 +34,7 @@ class AutoDRIVEWrapper(gym.Wrapper):
         self.env = UnityToGymWrapper(unity_env, allow_multiple_obs=True)
         self.observation_space = spaces.Dict(
             {
-                "state": spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32),
+                "state": spaces.Box(low=-np.inf, high=np.inf, shape=(1083,), dtype=np.float32),
             }
         )
         self.action_space = spaces.Box(
@@ -54,7 +54,7 @@ class AutoDRIVEWrapper(gym.Wrapper):
     def step(self, action: Any) -> Tuple[Any, SupportsFloat, bool, bool, Dict[str, Any]]:
         obs, reward, done, info = self.env.step(action)  # type: ignore
         try:
-            requests.post(self.url, json={"command": "publish_pose", "data": obs[0].tolist()})
+            requests.post(self.url, json={"command": "publish", "data": obs[0].tolist()})
         except Exception as e:
             print(f"Failed to send publish command: {e}")
         return self._convert_obs(obs), reward, done, False, info  # type: ignore
