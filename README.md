@@ -31,34 +31,41 @@ I recommend [Orbstack](https://orbstack.dev/download) on macos for great perform
 ## Open in Dev Container
 Open the command palette (Command+Shift+P), and press "Dev Containers: Rebuild and Reopen in Container":
 ![Vscode](./images/rebuild.png)
-# Remote setup (for deploying, currently only Linux is support)
-## AutoDRIVE
-Download and unzip the correct platform binary (currently only Linux is supported) from the [releases page](https://github.com/uci-f1tenth/AutoDRIVE-RLv2/releases), and put it in this directory, such that the binary is under `autodrive_macos_build/autodrive.app`, `autodrive_windows_build/autodrive/AutoDRIVE Simulator.exe`, or `autodrive_linux_build/autodrive.x86_64`.
-
-## Foxglove
-```bash
-source /opt/ros/$ROS_DISTRO/setup.bash
-ros2 launch foxglove_bridge foxglove_bridge_launch.xml
-```
-## SLAM
-```bash
-source /opt/ros/$ROS_DISTRO/setup.bash
-ros2 launch slam_toolbox online_async_launch.py slam_params_file:=autodrive_online_async.yaml
-```
-## ROS_BRIDGE
-```bash
-source /opt/ros/$ROS_DISTRO/setup.bash
-python3 ros_bridge.py
-```
-## DreamerV3
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source $HOME/.local/bin/env
-HYDRA_FULL_ERROR=1 uv run sheeprl/sheeprl.py exp=dreamer_v3_autodrive env=autodrive fabric.accelerator=auto
-```
-## PPO
+## Run the following commands in seperate terminals in vscode
+### PPO (Faster) or DreamerV3 (more accurate)
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
 UNITY_EDITOR=1 HYDRA_FULL_ERROR=1 uv run sheeprl/sheeprl.py exp=ppo env=autodrive fabric.accelerator=auto
 ```
+or
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
+UNITY_EDITOR=1 HYDRA_FULL_ERROR=1 uv run sheeprl/sheeprl.py exp=dreamer_v3_autodrive env=autodrive fabric.accelerator=auto
+```
+### Foxglove
+```bash
+source /opt/ros/$ROS_DISTRO/setup.bash
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml
+```
+### SLAM
+```bash
+source /opt/ros/$ROS_DISTRO/setup.bash
+ros2 launch slam_toolbox online_async_launch.py slam_params_file:=autodrive_online_async.yaml
+```
+### ROS_BRIDGE
+```bash
+source /opt/ros/$ROS_DISTRO/setup.bash
+python3 ros_bridge.py
+```
+## Press play in unity
+Hit the play button in the unity editor
+## Open Foxglove
+Foxglove visualizes our lidar data and ros state. So [make an account](https://foxglove.dev) (the deatils, like your organization), don't matter. Open ws://localhost:8765. It should look like this:
+![Running](./images/running.png)
+# Remote setup (for deploying, currently only Linux is support)
+## AutoDRIVE
+Download and unzip the correct platform binary (currently only Linux is supported) from the [releases page](https://github.com/uci-f1tenth/AutoDRIVE-RLv2/releases), and put it in this directory, such that the binary is under `autodrive_macos_build/autodrive.app`, `autodrive_windows_build/autodrive/AutoDRIVE Simulator.exe`, or `autodrive_linux_build/autodrive.x86_64`.
+## Th 
+TBD
