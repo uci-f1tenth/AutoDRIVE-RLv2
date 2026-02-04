@@ -174,7 +174,7 @@ def visualize_results(map_image, binary_map, skeleton_map, path, edt_map, filena
     print(f"Debug image saved to {filename}")
 
 def main():
-    filepath = "maps/racing_track.pgm"
+    filepath = "maps/complex_test.pgm"
     img, binary, skeleton, path, edt = generate_frenet(filepath)
     visualize_results(img, binary, skeleton, path, edt)
 
