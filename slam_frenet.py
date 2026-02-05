@@ -5,6 +5,52 @@ from skimage.morphology import skeletonize
 from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 
+def cycle_score(cycle, G):
+    avg_depth = np.mean([G.nodes[n]['depth'] for n in cycle])
+    length = len(cycle)
+
+    return avg_depth * np.log1p(length)
+
+def step_score(prev, cur, next, G):
+    depth = G.nodes[next]['depth']
+
+    if prev is not None:
+        v1 = np.array(cur) - np.array(prev)
+        v2 = np.array(next) - np.array(cur)
+        turn_penalty = 1.0 - np.dot(v1, v2) / (np.linalg.norm(v1)*np.linalg.norm(v2) + 1e-6)
+    else:
+        turn_penalty = 0.0
+
+    return depth - 0.3 * turn_penalty
+
+def greedy_order_cycle(G, start):
+    ordered = [start]
+    visited = {start}
+    cur = start
+
+    while True:
+        nbrs = list(G.neighbors(cur))
+
+        candidates = []
+        for n in nbrs:
+            if n not in visited or (n == start and len(ordered) > 10):
+                candidates.append(n)
+
+        if not candidates:
+            break
+
+        next_node = max(candidates, key=lambda n: G.nodes[n]['depth'])
+
+        if next_node == start:
+            ordered.append(start)
+            break
+
+        ordered.append(next_node)
+        visited.add(next_node)
+        cur = next_node
+
+    return ordered
+
 def generate_frenet(map_file_path, output_name = "track"):
     map_image = cv2.imread(map_file_path, cv2.IMREAD_GRAYSCALE)
     if map_image is None:
@@ -13,11 +59,18 @@ def generate_frenet(map_file_path, output_name = "track"):
 
     _, binary_map = cv2.threshold(map_image, 250, 255, cv2.THRESH_BINARY)
     euclidean_dist = cv2.distanceTransform(binary_map, cv2.DIST_L2, 5)
+
     skeleton_map = skeletonize(binary_map > 0)
 
     y, x = np.where(skeleton_map)
     points = [(int(px), int(py)) for px, py in zip(x, y)]
     point_set = set(points)
+
+    max_depth = np.max(euclidean_dist)
+    threshold = max_depth * 0.1 # tune
+
+    filtered_points = [p for p in points if euclidean_dist[p[1], p[0]] > threshold]
+    point_set = set(filtered_points)
 
     G = nx.Graph()
     
@@ -43,73 +96,61 @@ def generate_frenet(map_file_path, output_name = "track"):
             break
         max_component.remove_nodes_from(spurs)
 
-    # try:         # find longest cycle
-    #     cycles = list(nx.simple_cycles(max_component))
-    #     if not cycles:
-    #         raise nx.NetworkXNoCycle
-    #     longest_cycle = max(cycles, key = len)
-    #     ordered_points = longest_cycle
-    # except nx.NetworkXNoCycle:
-    #     print("no cycle found")
-    #     start_node = list(max.component.nodes())[0]
-    #     ordered_points = list(nx.dfs_preorder_nodes(max_component, source=start_node))
+    global_max_depth = max(d for _, d in max_component.nodes(data='depth'))
+    soft_min_depth = 0.1 * global_max_depth
 
-    # try:         # longest cycle based on given weight
-    #     basis = nx.minimum_cycle_basis(max_component, weight = 'weight')
-    #     if not basis:
-    #         raise nx.NetworkXNoCycle
-    #     longest_basis_cycle = max(basis, key = len)
-    #     sub_g = max_component.subgraph(longest_basis_cycle)
-    #     start_node = longest_basis_cycle[0]
-    #     ordered_points = list(nx.dfs_preorder_nodes(sub_g, source = start_node))
-    # except nx.NetworkXNoCycle:
-    #     print("no cycle found")
-    #     start_node = list(max.component.nodes())[0]
-    #     ordered_points = list(nx.dfs_preorder_nodes(max_component, source=start_node))
+    for n, d in list(max_component.nodes(data='depth')):
+        if d < soft_min_depth:
+            max_component.nodes[n]['depth'] *= 0.2
 
-    # Greedy traversal
-    # start_node = max(max_component.nodes(), key = lambda n: max_component.nodes[n]['depth'])
-    # ordered_points = [start_node]
-    # visited = {start_node}
-    # while len(visited) < len(max_component.nodes()):
-    #     cur = ordered_points[-1]
-    #     neighbors = [n for n in max_component.neighbors(cur) if n not in visited]
-    #     if not neighbors:
-    #         break
-    #     next_node = max(neighbors, key=lambda n: max_component.nodes[n]['depth'])
-    #     ordered_points.append(next_node)
-    #     visited.add(next_node)
+    components = sorted(nx.connected_components(max_component), key=len, reverse=True)
+    if not components:
+        raise Exception("No track remains after spur pruning")
+    max_component = max_component.subgraph(components[0]).copy()
 
-    # maximum weighted path
-    start_node = max(max_component.nodes(), key = lambda n: max_component.nodes[n]['depth'])
     for u, v in max_component.edges():
         depth_u = max_component.nodes[u]['depth']
         depth_v = max_component.nodes[v]['depth']
         avg_depth = (depth_u + depth_v) / 2.0
         max_component[u][v]['weight'] = 1.0 / (avg_depth + 1e-6)
 
-    dists = nx.single_source_dijkstra_path_length(max_component, start_node, weight = 'weight')
-    end_node = max(dists, key = dists.get)
+    cycles = [
+        c for c in nx.cycle_basis(max_component)
+        if len(c) > 30
+    ]
 
-    half1 = nx.shortest_path(max_component, start_node, end_node, weight = 'weight')
+    if cycles:
+        best_cycle = max(cycles, key=lambda c: cycle_score(c, max_component))
+        cycle_graph = max_component.subgraph(best_cycle).copy()
 
-    G_temp = max_component.copy()
-    G_temp.remove_nodes_from(half1[1:-1])
+        start_node = max(best_cycle, key = lambda n: cycle_graph.nodes[n]['depth'])
+        ordered_nodes = greedy_order_cycle(cycle_graph, start_node)
 
-    try:
-        half2 = nx.shortest_path(G_temp, end_node, start_node, weight = 'weight')
-        ordered_points = half1 + half2[1:]
-    except nx.NetworkXNoPath:
-        ordered_points = half1
-
-    if np.linalg.norm(np.array(ordered_points[0]) - np.array(ordered_points[-1])) < 20:
+        bc = 'periodic'
+        ordered_points = ordered_nodes
         if not np.array_equal(ordered_points[0], ordered_points[-1]):
             ordered_points.append(ordered_points[0])
-        bc = 'periodic'
+        # longest_cycle = max(cycles, key = len)
+        # cycle_graph = max_component.subgraph(longest_cycle).copy()
+
+        # start_node = max(longest_cycle, key = lambda n: cycle_graph.nodes[n]['depth'])
+        # dists = nx.single_source_dijkstra_path_length(cycle_graph, start_node, weight = 'weight')
+        # far_node = max(dists, key = dists.get)
+
+        # path_a = nx.shortest_path(cycle_graph, start_node, far_node, weight = 'weight')
+
+        # G_temp = cycle_graph.copy()
+        # G_temp.remove_nodes_from(path_a[1:-1])
+        # path_b = nx.shortest_path(G_temp, far_node, start_node, weight='weight')
+        
+        # ordered_points = path_a + path_b[1:]
     else:
+        start_node = max(max_component.nodes(), key=lambda n: max_component.nodes[n]['depth'])
+        dists = nx.single_source_dijkstra_path_length(max_component, start_node, weight='weight')
+        end_node = max(dists, key=dists.get)
+        ordered_points = nx.shortest_path(max_component, start_node, end_node, weight='weight')
         bc = 'not-a-knot'
 
-    ordered_points.append(ordered_points[0])
     path = np.array(ordered_points)
     mask = np.ones(len(path), dtype=bool)
     mask[1:] = np.any(np.diff(path, axis=0) != 0, axis=1)
@@ -125,8 +166,10 @@ def generate_frenet(map_file_path, output_name = "track"):
     if bc == 'periodic':
         if not np.allclose(path[0], path[-1]):
             path = np.vstack([path, path[0]])
-            s_extra = np.linalg.norm(path[-1] - path[-2])
-            s_accum = np.append(s_accum, s_accum[-1] + s_extra)
+            s_accum = np.append(
+                s_accum,
+                s_accum[-1] + np.linalg.norm(path[-1] - path[-2])
+            )
 
     sx = CubicSpline(s_accum, path[:, 0], bc_type=bc)
     sy = CubicSpline(s_accum, path[:, 1], bc_type=bc)
@@ -174,7 +217,7 @@ def visualize_results(map_image, binary_map, skeleton_map, path, edt_map, filena
     print(f"Debug image saved to {filename}")
 
 def main():
-    filepath = "maps/complex_test.pgm"
+    filepath = "maps/my_mapgi.pgm"
     img, binary, skeleton, path, edt = generate_frenet(filepath)
     visualize_results(img, binary, skeleton, path, edt)
 
