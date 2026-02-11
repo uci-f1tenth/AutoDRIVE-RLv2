@@ -5,6 +5,7 @@ defaults:
 # Override from `default` config
 id: autodrive
 num_envs: 1
+sync_env: True
 capture_video: False
 
 # Wrapper to be instantiated

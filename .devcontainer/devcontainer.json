@@ -1,0 +1,23 @@
+{
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "charliermarsh.ruff"
+            ]
+        }
+    },
+    "runArgs": [
+        "-p",
+        "8765:8765",
+        "-p",
+        "9000:9000"
+    ],
+    "forwardPorts": [
+        8765,
+        9000
+    ]
+}

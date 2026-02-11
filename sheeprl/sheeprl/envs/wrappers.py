@@ -96,8 +96,14 @@ class RestartOnException(gym.Wrapper):
             if self._fails > self._maxfails:
                 raise RuntimeError(f"The env crashed too many times: {self._fails}")
             gym.logger.warn(f"STEP - Restarting env after crash with {type(e).__name__}: {e}")
+            try:
+                self.env.close()
+            except Exception:
+                pass
             time.sleep(self._wait)
             self.env = self._env_fn()
+            self.action_space = self.env.action_space
+            self.observation_space = self.env.observation_space
             new_obs, info = self.env.reset()
             info.update({"restart_on_exception": True})
             return new_obs, 0.0, False, False, info
@@ -116,8 +122,14 @@ class RestartOnException(gym.Wrapper):
             if self._fails > self._maxfails:
                 raise RuntimeError(f"The env crashed too many times: {self._fails}")
             gym.logger.warn(f"RESET - Restarting env after crash with {type(e).__name__}: {e}")
+            try:
+                self.env.close()
+            except Exception:
+                pass
             time.sleep(self._wait)
             self.env = self._env_fn()
+            self.action_space = self.env.action_space
+            self.observation_space = self.env.observation_space
             new_obs, info = self.env.reset(seed=seed, options=options)
             info.update({"restart_on_exception": True})
             return new_obs, info
